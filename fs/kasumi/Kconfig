@@ -1,0 +1,7 @@
+config KASUMI
+	bool "Kasumi VFS Path Control"
+	default y
+	help
+	  Kasumi is a Linux kernel module for Android GKI/Linux path control.
+	  It provides redirection, hiding, merge/injection, and spoofing behavior
+	  through an anonymous-fd + ioctl control plane.
