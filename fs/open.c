@@ -474,7 +474,7 @@ out:
 
 SYSCALL_DEFINE3(faccessat, int, dfd, const char __user *, filename, int, mode)
 {
-#ifdef CONFIG_KSU
+#if defined(CONFIG_KSU) && !defined(CONFIG_KSU_SUSFS)
 	extern int ksu_handle_faccessat(int *, const char __user **, int *, int *);
 	ksu_handle_faccessat(&dfd, &filename, &mode, NULL);
 #endif
