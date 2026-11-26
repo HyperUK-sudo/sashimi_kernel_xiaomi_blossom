@@ -20,9 +20,10 @@
 #include <linux/uaccess.h>
 #include <linux/mm_inline.h>
 #include <linux/pkeys.h>
+#include <linux/srcu.h>
 #if defined(CONFIG_KSU_SUSFS_SUS_KSTAT) || defined(CONFIG_KSU_SUSFS_SUS_MAP) || defined(CONFIG_KSU_SUSFS_OPEN_REDIRECT)
 #include <linux/susfs_def.h>
-#endif // #if defined(CONFIG_KSU_SUSFS_SUS_KSTAT) || defined(CONFIG_KSU_SUSFS_SUS_MAP) || defined(CONFIG_KSU_SUSFS_OPEN_REDIRECT)
+#endif
 
 #include <asm/elf.h>
 #include <asm/tlb.h>
@@ -495,11 +496,11 @@ static int show_vma_header_prefix(struct seq_file *m, unsigned long start,
 
 #ifdef CONFIG_KSU_SUSFS_SUS_KSTAT
 extern void susfs_sus_kstat_spoof_show_map_vma(struct inode *inode, dev_t *out_dev, unsigned long *out_ino);
-#endif // #ifdef CONFIG_KSU_SUSFS_SUS_KSTAT
+#endif
 #ifdef CONFIG_KSU_SUSFS_OPEN_REDIRECT
 extern struct srcu_struct susfs_srcu_open_redirect;
 extern int susfs_open_redirect_spoof_show_map_vma_srcu(struct inode *inode, unsigned long *out_ino, dev_t *out_dev, char **out_spoofed_name);
-#endif // #ifdef CONFIG_KSU_SUSFS_OPEN_REDIRECT
+#endif
 
 static void
 show_map_vma(struct seq_file *m, struct vm_area_struct *vma)
@@ -1118,13 +1119,10 @@ static int show_smaps_rollup(struct seq_file *m, void *v)
 
 	for (vma = priv->mm->mmap; vma;) {
 #ifdef CONFIG_KSU_SUSFS_SUS_MAP
-		if (vma->vm_file && SUSFS_IS_INODE_SUS_MAP(file_inode(vma->vm_file)))
-			goto bypass_orig_flow;
+		if (!vma->vm_file ||
+		    !SUSFS_IS_INODE_SUS_MAP(file_inode(vma->vm_file)))
 #endif
-		smap_gather_stats(vma, &mss);
-#ifdef CONFIG_KSU_SUSFS_SUS_MAP
-bypass_orig_flow:
-#endif
+			smap_gather_stats(vma, &mss);
 		last_vma_end = vma->vm_end;
 
 		/*
@@ -1898,13 +1896,14 @@ static ssize_t pagemap_read(struct file *file, char __user *buf,
 			goto out_free;
 #ifdef CONFIG_KSU_SUSFS_SUS_MAP
 		vma = find_vma(mm, start_vaddr);
-		if (vma && vma->vm_file && SUSFS_IS_INODE_SUS_MAP(file_inode(vma->vm_file)))
-			goto bypass_orig_flow;
-#endif // #ifdef CONFIG_KSU_SUSFS_SUS_MAP
+		if (vma && vma->vm_file &&
+		    SUSFS_IS_INODE_SUS_MAP(file_inode(vma->vm_file))) {
+			mmap_read_unlock(mm);
+			start_vaddr = end;
+			continue;
+		}
+#endif
 		ret = walk_page_range(start_vaddr, end, &pagemap_walk);
-#ifdef CONFIG_KSU_SUSFS_SUS_MAP
-bypass_orig_flow:
-#endif // #ifdef CONFIG_KSU_SUSFS_SUS_MAP
 		mmap_read_unlock(mm);
 		start_vaddr = end;
 

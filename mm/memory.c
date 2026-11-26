@@ -80,10 +80,9 @@
 #include <asm/tlb.h>
 #include <asm/tlbflush.h>
 #include <linux/pgtable.h>
-
 #ifdef CONFIG_KSU_SUSFS_SUS_MAP
 #include <linux/susfs_def.h>
-#endif // #ifdef CONFIG_KSU_SUSFS_SUS_MAP
+#endif
 
 #include "internal.h"
 
@@ -5262,10 +5261,6 @@ int __access_remote_vm(struct task_struct *tsk, struct mm_struct *mm,
 		}
 	}
 
-#ifdef CONFIG_KSU_SUSFS_SUS_MAP
-	vma = find_vma(mm, addr);
-#endif // #ifdef CONFIG_KSU_SUSFS_SUS_MAP
-
 	/* ignore errors, just check how much was successfully transferred */
 	while (len) {
 		int bytes, ret, offset;
@@ -5273,10 +5268,11 @@ int __access_remote_vm(struct task_struct *tsk, struct mm_struct *mm,
 		struct page *page = NULL;
 
 #ifdef CONFIG_KSU_SUSFS_SUS_MAP
-		if (vma && vma->vm_file && SUSFS_IS_INODE_SUS_MAP(file_inode(vma->vm_file)))
+		vma = find_vma(mm, addr);
+		if (vma && vma->vm_file &&
+		    SUSFS_IS_INODE_SUS_MAP(file_inode(vma->vm_file)))
 			break;
-#endif // #ifdef CONFIG_KSU_SUSFS_SUS_MAP
-
+#endif
 		ret = get_user_pages_remote(tsk, mm, addr, 1,
 				gup_flags, &page, &vma, NULL);
 		if (ret <= 0) {
